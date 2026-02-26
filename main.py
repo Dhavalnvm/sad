@@ -21,6 +21,7 @@ class Query(BaseModel):
     text: str
 
 CHROMA_STORE = "chroma_store"
+SUMMARY_KEYWORDS = {"summarize", "summary", "overview", "summarise", "what is in", "what's in"}
 
 retriever = Retriever(db_path=CHROMA_STORE)
 llm = LLMInterface()
@@ -29,6 +30,7 @@ last_answer = ""
 MIN_Q = 2
 MAX_Q = 2000
 
+
 def normalize(s: str):
     if not s:
         return ""
@@ -36,14 +38,21 @@ def normalize(s: str):
     return re.sub(r"\s+", " ", s.lower()).strip()
 
 
+def is_summary_query(text: str) -> bool:
+    normalized = text.lower().strip()
+    return any(kw in normalized for kw in SUMMARY_KEYWORDS)
+
+
 @app.post("/chat")
 async def chat(q: Query, request: Request):
     global last_answer
     txt = q.text.strip()
+
     if not (MIN_Q <= len(txt) <= MAX_Q):
         return {"response": "Please ask a specific question about the uploaded documents."}
 
-    context, src = retriever.retrieve(txt)
+    show_page = not is_summary_query(txt)
+    context, src = retriever.retrieve(txt, show_page=show_page)
 
     if context == "NO_RELEVANT":
         return {"response": "I can only answer questions about the uploaded documents."}
@@ -72,7 +81,6 @@ async def upload(request: Request, file: UploadFile = File(...)):
 
     index_single_file(path)
 
-    # Reload the store so the retriever picks up the newly indexed vectors
     try:
         retriever.store.load(CHROMA_STORE)
     except Exception as e:
@@ -83,7 +91,6 @@ async def upload(request: Request, file: UploadFile = File(...)):
 
 @app.post("/reset")
 async def reset(delete_pdfs: bool = False):
-    # Wipe and recreate the Chroma store folder
     if os.path.exists(CHROMA_STORE):
         shutil.rmtree(CHROMA_STORE)
     os.makedirs(CHROMA_STORE, exist_ok=True)
@@ -96,7 +103,5 @@ async def reset(delete_pdfs: bool = False):
                 except Exception as e:
                     logger.warning("[reset] Could not delete %s: %s", f, e)
 
-    # Reinitialise the retriever against the now-empty store
     retriever.store.load(CHROMA_STORE)
-
     return {"message": "Knowledge base reset."}
