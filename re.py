@@ -7,8 +7,6 @@ from vector_store import VectorStore
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-SUMMARY_KEYWORDS = {"summarize", "summary", "overview", "summarise", "what is in", "what's in"}
-
 
 class Retriever:
     def __init__(self, db_path: str = "chroma_store", dimension: int = 1536, max_distance: float = 1.15):
@@ -32,7 +30,7 @@ class Retriever:
         filename = meta.get("source") or "unknown"
         page = meta.get("page")
 
-        if page is None or not show_page:
+        if page is None or page == "" or not show_page:
             return f"[SOURCE: {filename}]"
         return f"[SOURCE: {filename} p.{page}]"
 
@@ -42,13 +40,12 @@ class Retriever:
             return "NO_RELEVANT", []
 
         q_emb = self._embed(query)
-
         results = self.store.search(q_emb, k=k)
+
         if not results:
             return "NO_RELEVANT", []
 
         best_distance = results[0]["score"]
-
         if best_distance > self.max_distance:
             return "NO_RELEVANT", []
 
@@ -58,7 +55,6 @@ class Retriever:
         for item in results:
             text = item.get("text", "")
             meta = item.get("meta", {})
-
             src_tag = self._format_source(meta, show_page=show_page)
             block = f"{src_tag}\n{text}"
             context_blocks.append(block)
