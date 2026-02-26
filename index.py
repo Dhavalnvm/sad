@@ -66,6 +66,5 @@ def index_single_file(path: str, db: str = CHROMA_STORE, batch: int = 17):
         store.add_vectors(vecs, batch_chunks)
         added += len(vecs)
 
-    # Chroma auto-persists, but calling save() keeps the interface consistent
     store.save(db)
     logger.info(f"Indexed {added} vectors from {filename}.")
