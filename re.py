@@ -40,13 +40,29 @@ class Retriever:
             return "NO_RELEVANT", []
 
         q_emb = self._embed(query)
-        results = self.store.search(q_emb, k=k)
 
+        # Pull more chunks for summary queries, fewer for targeted ones
+        is_summary = not show_page
+        effective_k = 10 if is_summary else k
+
+        results = self.store.search(q_emb, k=effective_k)
         if not results:
             return "NO_RELEVANT", []
 
         best_distance = results[0]["score"]
-        if best_distance > self.max_distance:
+
+        # Relax threshold for summaries and short queries
+        if is_summary or len(query.split()) <= 3:
+            effective_threshold = self.max_distance * 1.5
+        else:
+            effective_threshold = self.max_distance
+
+        if best_distance > effective_threshold:
+            logger.warning(
+                "[Retriever] Best distance %.3f exceeds threshold %.3f",
+                best_distance,
+                effective_threshold,
+            )
             return "NO_RELEVANT", []
 
         context_blocks = []
