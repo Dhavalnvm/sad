@@ -1,5 +1,3 @@
-import json
-import os
 import chromadb
 from chromadb.config import Settings
 
@@ -27,7 +25,17 @@ class VectorStore:
         ids = [str(len(self.texts) + i) for i in range(len(vectors))]
         embeddings = [v if isinstance(v, list) else v.tolist() for v in vectors]
         documents = [m["text"] for m in metadata_list]
-        metadatas = [m for m in metadata_list]
+        metadatas = []
+        for m in metadata_list:
+            clean = {}
+            for k, v in m.items():
+                if v is None:
+                    clean[k] = ""
+                elif isinstance(v, (str, int, float, bool)):
+                    clean[k] = v
+                else:
+                    clean[k] = str(v)
+            metadatas.append(clean)
 
         self._collection.add(
             ids=ids,
@@ -41,16 +49,14 @@ class VectorStore:
             self.meta.append(m)
 
     def save(self, folder: str = "chroma_store"):
-        # ChromaDB PersistentClient auto-saves to disk — no manual save needed.
-        # We keep this method for API compatibility with the rest of the codebase.
+        # ChromaDB PersistentClient auto-saves — no manual step needed.
+        # Kept for API compatibility.
         if self._client is None:
             self._init_collection(folder)
 
     def load(self, folder: str = "chroma_store"):
         self._init_collection(folder)
-
         results = self._collection.get(include=["documents", "metadatas"])
-
         self.texts = results.get("documents") or []
         self.meta = results.get("metadatas") or []
 
@@ -58,11 +64,15 @@ class VectorStore:
         if self._collection is None:
             return []
 
+        count = self._collection.count()
+        if count == 0:
+            return []
+
         embedding = query_emb if isinstance(query_emb, list) else query_emb.tolist()
 
         results = self._collection.query(
             query_embeddings=[embedding],
-            n_results=min(k, self._collection.count()),
+            n_results=min(k, count),
             include=["documents", "metadatas", "distances"],
         )
 
