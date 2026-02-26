@@ -31,6 +31,8 @@ class LLMInterface:
             "- Use concise, structured explanations with bullets if helpful.\n"
             "- Combine related content from multiple snippets.\n"
             "- Quote/paraphrase text only when it appears in Context.\n"
+            "- If the question asks for a summary or overview, synthesize all provided context into a "
+            "structured summary grouped by topic. Do not just list sources.\n"
             "- At the end, produce a 'Sources:' line that INCLUDES page numbers.\n"
             "- You MUST extract page numbers from context headers like [SOURCE: filename.pdf p.7].\n"
             "- If multiple pages appear for the same filename, list all pages.\n"
@@ -45,7 +47,7 @@ class LLMInterface:
 
         payload = {
             "model": self.chat_model,
-            "temperature": 0.1,
+            "temperature": 0,
             "max_tokens": 900,
             "messages": [
                 {"role": "system", "content": system_prompt},
@@ -55,6 +57,7 @@ class LLMInterface:
                         f"Context:\n{context}\n\n"
                         f"Question:\n{query}\n\n"
                         "Instruction: Answer strictly from the context. "
+                        "If the question asks for a summary, synthesize all context into a structured overview. "
                         "List any cited document names at the end under 'Sources:'."
                     )
                 }
