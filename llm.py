@@ -18,6 +18,9 @@ class LLMInterface:
         if refusal:
             return "I can only answer questions about the uploaded documents."
 
+        is_summary = any(kw in query.lower() for kw in
+                         {"summarize", "summary", "overview", "summarise", "what is in", "what's in"})
+
         system_prompt = (
             "You are a strict RAG assistant for the user's uploaded documents.\n\n"
             "SAFETY & SCOPE:\n"
@@ -31,8 +34,9 @@ class LLMInterface:
             "- Use concise, structured explanations with bullets if helpful.\n"
             "- Combine related content from multiple snippets.\n"
             "- Quote/paraphrase text only when it appears in Context.\n"
-            "- If the question asks for a summary or overview, synthesize all provided context into a "
-            "structured summary grouped by topic. Do not just list sources.\n"
+            "- If the question asks for a summary or overview, synthesize ALL provided context into a "
+            "comprehensive structured summary grouped by topic, covering every major section of the document. "
+            "Do not stop early. Do not just list sources.\n"
             "- At the end, produce a 'Sources:' line that INCLUDES page numbers.\n"
             "- You MUST extract page numbers from context headers like [SOURCE: filename.pdf p.7].\n"
             "- If multiple pages appear for the same filename, list all pages.\n"
@@ -48,7 +52,7 @@ class LLMInterface:
         payload = {
             "model": self.chat_model,
             "temperature": 0,
-            "max_tokens": 900,
+            "max_tokens": 2500 if is_summary else 900,
             "messages": [
                 {"role": "system", "content": system_prompt},
                 {
@@ -57,7 +61,8 @@ class LLMInterface:
                         f"Context:\n{context}\n\n"
                         f"Question:\n{query}\n\n"
                         "Instruction: Answer strictly from the context. "
-                        "If the question asks for a summary, synthesize all context into a structured overview. "
+                        "If the question asks for a summary, synthesize the ENTIRE context into a "
+                        "comprehensive structured overview covering all major topics and sections. "
                         "List any cited document names at the end under 'Sources:'."
                     )
                 }
